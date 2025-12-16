@@ -14,6 +14,7 @@ function createPrismaClient(): PrismaClient {
     return new PrismaClient()
   }
 
+  // PrismaNeon expects PoolConfig from @neondatabase/serverless
   const adapter = new PrismaNeon({ connectionString })
 
   return new PrismaClient({
