@@ -1,7 +1,20 @@
 import { NextResponse } from "next/server"
+import prisma from "@/lib/prisma"
 
 export async function GET() {
   const dbUrl = process.env.DATABASE_URL
+
+  let dbStatus = "unknown"
+  let dbError = null
+  let userCount = 0
+
+  try {
+    userCount = await prisma.user.count()
+    dbStatus = "connected"
+  } catch (error) {
+    dbStatus = "error"
+    dbError = error instanceof Error ? error.message : String(error)
+  }
 
   return NextResponse.json({
     env: {
@@ -11,6 +24,11 @@ export async function GET() {
       NEXTAUTH_SECRET_EXISTS: !!process.env.NEXTAUTH_SECRET,
       NEXTAUTH_URL: process.env.NEXTAUTH_URL || "NOT SET",
       NODE_ENV: process.env.NODE_ENV,
+    },
+    database: {
+      status: dbStatus,
+      error: dbError,
+      userCount: userCount,
     }
   })
 }
