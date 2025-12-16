@@ -10,6 +10,7 @@ import {
   ArrowRight,
   Star,
   MapPin,
+  KeyRound,
 } from "lucide-react"
 import SearchBox from "@/components/property/SearchBox"
 import { Button } from "@/components/ui/button"
@@ -92,6 +93,26 @@ export default async function HomePage() {
 
   return (
     <div>
+      {/* Demo Credentials Banner */}
+      <div className="bg-amber-50 border-b border-amber-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+            <div className="flex items-center gap-2 text-amber-800">
+              <KeyRound className="w-5 h-5" />
+              <span className="font-medium">Demo Credentials:</span>
+              <code className="bg-amber-100 px-2 py-0.5 rounded text-sm">admin@propestate.com</code>
+              <span>/</span>
+              <code className="bg-amber-100 px-2 py-0.5 rounded text-sm">admin123</code>
+            </div>
+            <Link href="/admin">
+              <Button size="sm" className="bg-amber-600 hover:bg-amber-700 text-white">
+                Admin Login
+              </Button>
+            </Link>
+          </div>
+        </div>
+      </div>
+
       {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-blue-900 via-blue-800 to-indigo-900 text-white">
         <div className="absolute inset-0 bg-[url('/pattern.svg')] opacity-10"></div>
