@@ -1,12 +1,14 @@
-import { NextResponse } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
+import { getToken } from "next-auth/jwt"
 import prisma from "@/lib/prisma"
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const dbUrl = process.env.DATABASE_URL
 
   let dbStatus = "unknown"
   let dbError = null
   let userCount = 0
+  let token = null
 
   try {
     userCount = await prisma.user.count()
@@ -14,6 +16,12 @@ export async function GET() {
   } catch (error) {
     dbStatus = "error"
     dbError = error instanceof Error ? error.message : String(error)
+  }
+
+  try {
+    token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+  } catch (error) {
+    token = { error: error instanceof Error ? error.message : String(error) }
   }
 
   return NextResponse.json({
@@ -29,6 +37,9 @@ export async function GET() {
       status: dbStatus,
       error: dbError,
       userCount: userCount,
+    },
+    session: {
+      token: token,
     }
   })
 }
