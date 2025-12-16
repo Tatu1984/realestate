@@ -1,33 +1,21 @@
 import { PrismaClient } from '@prisma/client'
-import { PrismaLibSql } from '@prisma/adapter-libsql'
+import { PrismaPg } from '@prisma/adapter-pg'
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
 function createPrismaClient() {
-  const databaseUrl = process.env.DATABASE_URL || 'file:./dev.db'
-
-  // For LibSQL/Turso databases
-  if (databaseUrl.startsWith('libsql://') || databaseUrl.startsWith('file:')) {
-    const adapter = new PrismaLibSql({
-      url: databaseUrl,
-      authToken: process.env.DATABASE_AUTH_TOKEN,
-    })
-    return new PrismaClient({
-      adapter,
-      log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
-    })
-  }
-
-  // For standard databases (PostgreSQL, MySQL, etc.)
+  const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL! })
   return new PrismaClient({
-    log: process.env.NODE_ENV === 'development' ? ['query', 'error', 'warn'] : ['error'],
+    adapter,
+    log: process.env.NODE_ENV === 'development' ? ['error', 'warn'] : ['error'],
   })
 }
 
-export const prisma = globalForPrisma.prisma ?? createPrismaClient()
+const prisma = globalForPrisma.prisma ?? createPrismaClient()
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma
 
+export { prisma }
 export default prisma
