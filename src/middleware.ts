@@ -2,6 +2,11 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://")
+const cookieName = useSecureCookies
+  ? "__Secure-authjs.session-token"
+  : "authjs.session-token"
+
 // Routes that require authentication
 const protectedRoutes = [
   '/dashboard',
@@ -98,7 +103,7 @@ export async function middleware(request: NextRequest) {
 
   // Check if accessing admin routes
   if (adminRoutes.some(route => pathname.startsWith(route))) {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName })
 
     if (!token) {
       const loginUrl = new URL('/login', request.url)
@@ -113,7 +118,7 @@ export async function middleware(request: NextRequest) {
 
   // Check if accessing protected routes
   if (protectedRoutes.some(route => pathname.startsWith(route))) {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName })
 
     if (!token) {
       const loginUrl = new URL('/login', request.url)
@@ -124,7 +129,7 @@ export async function middleware(request: NextRequest) {
 
   // Check admin API routes
   if (pathname.startsWith('/api/admin/')) {
-    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName })
 
     if (!token) {
       return NextResponse.json(
@@ -151,7 +156,7 @@ export async function middleware(request: NextRequest) {
   if (protectedApiPatterns.some(pattern => pathname.startsWith(pattern))) {
     // Allow GET requests to some endpoints for public access
     if (request.method !== 'GET' || pathname === '/api/favorites') {
-      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+      const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName })
 
       if (!token) {
         return NextResponse.json(

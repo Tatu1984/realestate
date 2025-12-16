@@ -2,6 +2,11 @@ import { NextRequest, NextResponse } from "next/server"
 import { getToken } from "next-auth/jwt"
 import prisma from "@/lib/prisma"
 
+const useSecureCookies = process.env.NEXTAUTH_URL?.startsWith("https://")
+const cookieName = useSecureCookies
+  ? "__Secure-authjs.session-token"
+  : "authjs.session-token"
+
 export async function GET(request: NextRequest) {
   const dbUrl = process.env.DATABASE_URL
 
@@ -19,7 +24,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET })
+    token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET, cookieName })
   } catch (error) {
     token = { error: error instanceof Error ? error.message : String(error) }
   }
