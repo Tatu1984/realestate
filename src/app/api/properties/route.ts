@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
 import { auth } from "@/lib/auth"
+import { createPropertySchema, formatZodError } from "@/lib/validations"
+import { logger } from "@/lib/logger"
+import { checkRateLimit } from "@/lib/rate-limit"
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,37 +16,54 @@ export async function GET(request: NextRequest) {
     const minPrice = searchParams.get("minPrice")
     const maxPrice = searchParams.get("maxPrice")
     const sortBy = searchParams.get("sortBy") || "newest"
-    const page = parseInt(searchParams.get("page") || "1")
-    const limit = parseInt(searchParams.get("limit") || "12")
+    const page = Math.max(1, parseInt(searchParams.get("page") || "1"))
+    const limit = Math.min(100, Math.max(1, parseInt(searchParams.get("limit") || "12")))
 
     // Build where clause
     const where: Record<string, unknown> = {
       status: "ACTIVE",
     }
 
-    if (listingType) {
+    if (listingType && ['SELL', 'RENT', 'PG', 'ROOMMATE'].includes(listingType)) {
       where.listingType = listingType
     }
 
     if (propertyType && propertyType !== "All Types") {
-      where.propertyType = propertyType.toUpperCase()
+      const validTypes = ['APARTMENT', 'HOUSE', 'VILLA', 'PLOT', 'COMMERCIAL', 'PG', 'ROOMMATE']
+      const upperType = propertyType.toUpperCase()
+      if (validTypes.includes(upperType)) {
+        where.propertyType = upperType
+      }
     }
 
     if (bedrooms && bedrooms !== "Any") {
       if (bedrooms === "5+") {
         where.bedrooms = { gte: 5 }
       } else {
-        where.bedrooms = parseInt(bedrooms)
+        const bedroomNum = parseInt(bedrooms)
+        if (!isNaN(bedroomNum) && bedroomNum >= 0) {
+          where.bedrooms = bedroomNum
+        }
       }
     }
 
     if (minPrice || maxPrice) {
       where.price = {}
-      if (minPrice) (where.price as Record<string, number>).gte = parseFloat(minPrice)
-      if (maxPrice) (where.price as Record<string, number>).lte = parseFloat(maxPrice)
+      if (minPrice) {
+        const minPriceNum = parseFloat(minPrice)
+        if (!isNaN(minPriceNum) && minPriceNum >= 0) {
+          (where.price as Record<string, number>).gte = minPriceNum
+        }
+      }
+      if (maxPrice) {
+        const maxPriceNum = parseFloat(maxPrice)
+        if (!isNaN(maxPriceNum) && maxPriceNum >= 0) {
+          (where.price as Record<string, number>).lte = maxPriceNum
+        }
+      }
     }
 
-    if (location) {
+    if (location && location.length <= 100) {
       where.OR = [
         { city: { contains: location } },
         { locality: { contains: location } },
@@ -94,7 +114,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error("Error fetching properties:", error)
+    logger.error("Error fetching properties", error)
     return NextResponse.json(
       { error: "Failed to fetch properties" },
       { status: 500 }
@@ -104,6 +124,12 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const rateLimitResponse = checkRateLimit(request, 'api')
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
+
     const session = await auth()
 
     if (!session?.user) {
@@ -115,46 +141,62 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json()
 
+    // Validate input with Zod
+    const validationResult = createPropertySchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: formatZodError(validationResult.error) },
+        { status: 400 }
+      )
+    }
+
+    const data = validationResult.data
+
     const property = await prisma.property.create({
       data: {
         userId: session.user.id,
-        title: body.title,
-        description: body.description,
-        propertyType: body.propertyType,
-        listingType: body.listingType,
-        address: body.address,
-        locality: body.locality,
-        city: body.city,
-        state: body.state,
-        pincode: body.pincode,
-        bedrooms: body.bedrooms,
-        bathrooms: body.bathrooms,
-        balconies: body.balconies,
-        floorNumber: body.floorNumber,
-        totalFloors: body.totalFloors,
-        facing: body.facing,
-        furnishing: body.furnishing,
-        builtUpArea: body.builtUpArea,
-        carpetArea: body.carpetArea,
-        plotArea: body.plotArea,
-        price: body.price,
-        pricePerSqft: body.pricePerSqft,
-        maintenance: body.maintenance,
-        securityDeposit: body.securityDeposit,
-        images: body.images ? JSON.stringify(body.images) : null,
-        videoUrl: body.videoUrl,
-        amenities: body.amenities ? JSON.stringify(body.amenities) : null,
-        availableFrom: body.availableFrom ? new Date(body.availableFrom) : null,
+        title: data.title,
+        description: data.description || null,
+        propertyType: data.propertyType,
+        listingType: data.listingType,
+        address: data.address,
+        locality: data.locality,
+        city: data.city,
+        state: data.state,
+        pincode: data.pincode || null,
+        latitude: data.latitude || null,
+        longitude: data.longitude || null,
+        bedrooms: data.bedrooms || null,
+        bathrooms: data.bathrooms || null,
+        balconies: data.balconies || null,
+        floorNumber: data.floorNumber || null,
+        totalFloors: data.totalFloors || null,
+        facing: data.facing || null,
+        furnishing: data.furnishing || null,
+        builtUpArea: data.builtUpArea || null,
+        carpetArea: data.carpetArea || null,
+        plotArea: data.plotArea || null,
+        price: data.price,
+        pricePerSqft: data.pricePerSqft || null,
+        maintenance: data.maintenance || null,
+        securityDeposit: data.securityDeposit || null,
+        images: data.images || null,
+        videoUrl: data.videoUrl || null,
+        amenities: data.amenities || null,
+        availableFrom: data.availableFrom ? new Date(data.availableFrom) : null,
+        projectId: data.projectId || null,
         status: "PENDING", // Admin needs to approve
       },
     })
+
+    logger.info("Property created", { propertyId: property.id, userId: session.user.id })
 
     return NextResponse.json(
       { message: "Property created successfully", property },
       { status: 201 }
     )
   } catch (error) {
-    console.error("Error creating property:", error)
+    logger.error("Error creating property", error)
     return NextResponse.json(
       { error: "Failed to create property" },
       { status: 500 }

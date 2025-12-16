@@ -4,6 +4,7 @@ import { notFound } from "next/navigation"
 import { Calendar, ChevronRight, ArrowLeft } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import prisma from "@/lib/prisma"
+import { sanitizeHTML } from "@/lib/sanitize"
 
 async function getArticle(slug: string) {
   try {
@@ -100,7 +101,7 @@ export default async function NewsArticlePage({ params }: { params: Promise<{ sl
 
           <div
             className="prose prose-lg max-w-none prose-headings:font-bold prose-a:text-blue-600"
-            dangerouslySetInnerHTML={{ __html: article.content }}
+            dangerouslySetInnerHTML={{ __html: sanitizeHTML(article.content) }}
           />
         </article>
 

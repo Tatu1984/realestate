@@ -17,11 +17,6 @@ async function getAgents() {
             avatar: true,
           },
         },
-        _count: {
-          select: {
-            user: false,
-          },
-        },
       },
       orderBy: [
         { isFeatured: "desc" },

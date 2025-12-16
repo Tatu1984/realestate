@@ -1,34 +1,52 @@
 import { NextRequest, NextResponse } from "next/server"
 import prisma from "@/lib/prisma"
+import { createContactSchema, formatZodError } from "@/lib/validations"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+import { sendContactFormEmail } from "@/lib/email"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, email, phone, subject, message } = body
+    // Rate limiting for contact forms
+    const rateLimitResponse = checkRateLimit(request, 'contact')
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
 
-    if (!name || !email || !message) {
+    const body = await request.json()
+
+    // Validate input with Zod
+    const validationResult = createContactSchema.safeParse(body)
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: formatZodError(validationResult.error) },
         { status: 400 }
       )
     }
+
+    const { name, email, phone, subject, message } = validationResult.data
 
     const contactMessage = await prisma.contactMessage.create({
       data: {
         name,
         email,
-        phone,
-        subject,
+        phone: phone || null,
+        subject: subject || null,
         message,
       },
     })
+
+    // Send email notification to admin
+    await sendContactFormEmail(name, email, phone || null, subject || null, message)
+
+    logger.info("Contact form submitted", { id: contactMessage.id, email })
 
     return NextResponse.json(
       { message: "Message sent successfully", id: contactMessage.id },
       { status: 201 }
     )
   } catch (error) {
-    console.error("Contact form error:", error)
+    logger.error("Contact form error", error)
     return NextResponse.json(
       { error: "Failed to send message" },
       { status: 500 }

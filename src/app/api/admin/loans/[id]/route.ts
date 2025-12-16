@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import { auth } from "@/lib/auth"
 import prisma from "@/lib/prisma"
+import { updateLoanSchema, formatZodError } from "@/lib/validations"
+import { logger } from "@/lib/logger"
 
 export async function PATCH(
   request: NextRequest,
@@ -15,14 +17,25 @@ export async function PATCH(
     const { id } = await params
     const body = await request.json()
 
+    // Validate input with Zod
+    const validationResult = updateLoanSchema.safeParse(body)
+    if (!validationResult.success) {
+      return NextResponse.json(
+        { error: formatZodError(validationResult.error) },
+        { status: 400 }
+      )
+    }
+
     const loan = await prisma.loan.update({
       where: { id },
-      data: body,
+      data: validationResult.data,
     })
+
+    logger.info("Loan updated", { id, adminId: session.user.id })
 
     return NextResponse.json({ loan })
   } catch (error) {
-    console.error("Error updating loan:", error)
+    logger.error("Error updating loan", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -40,9 +53,11 @@ export async function DELETE(
     const { id } = await params
     await prisma.loan.delete({ where: { id } })
 
+    logger.info("Loan deleted", { id, adminId: session.user.id })
+
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error("Error deleting loan:", error)
+    logger.error("Error deleting loan", error)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

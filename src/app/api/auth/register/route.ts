@@ -1,18 +1,31 @@
 import { NextRequest, NextResponse } from "next/server"
 import bcrypt from "bcryptjs"
 import prisma from "@/lib/prisma"
+import { registerSchema, formatZodError } from "@/lib/validations"
+import { checkRateLimit } from "@/lib/rate-limit"
+import { logger } from "@/lib/logger"
+import { sendWelcomeEmail } from "@/lib/email"
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json()
-    const { name, email, password, phone, userType } = body
+    // Rate limiting for auth endpoints
+    const rateLimitResponse = checkRateLimit(request, 'auth')
+    if (rateLimitResponse) {
+      return rateLimitResponse
+    }
 
-    if (!name || !email || !password) {
+    const body = await request.json()
+
+    // Validate input with Zod
+    const validationResult = registerSchema.safeParse(body)
+    if (!validationResult.success) {
       return NextResponse.json(
-        { error: "Missing required fields" },
+        { error: formatZodError(validationResult.error) },
         { status: 400 }
       )
     }
+
+    const { name, email, password, phone, userType } = validationResult.data
 
     const existingUser = await prisma.user.findUnique({
       where: { email }
@@ -32,7 +45,7 @@ export async function POST(request: NextRequest) {
         name,
         email,
         password: hashedPassword,
-        phone,
+        phone: phone || null,
         userType: userType || "INDIVIDUAL",
       }
     })
@@ -56,12 +69,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // Send welcome email
+    await sendWelcomeEmail(email, name)
+
+    logger.authEvent("User registered", user.id, { email, userType })
+
     return NextResponse.json(
       { message: "User created successfully", userId: user.id },
       { status: 201 }
     )
   } catch (error) {
-    console.error("Registration error:", error)
+    logger.error("Registration error", error)
     return NextResponse.json(
       { error: "Internal server error" },
       { status: 500 }
