@@ -10,8 +10,14 @@ const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined
 }
 
-function createPrismaClient() {
-  const connectionString = process.env.DATABASE_URL!
+function createPrismaClient(): PrismaClient {
+  const connectionString = process.env.DATABASE_URL
+
+  // During build time, DATABASE_URL might not be available
+  if (!connectionString) {
+    console.warn('DATABASE_URL not set, using dummy client for build')
+    return new PrismaClient()
+  }
 
   const pool = new Pool({ connectionString })
   const adapter = new PrismaPg(pool)

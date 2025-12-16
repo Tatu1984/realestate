@@ -18,6 +18,9 @@ import { Badge } from "@/components/ui/badge"
 import prisma from "@/lib/prisma"
 import { formatPrice } from "@/lib/utils"
 
+// Force dynamic rendering - don't pre-render at build time
+export const dynamic = 'force-dynamic'
+
 const cities = [
   { name: "Mumbai", image: "https://images.unsplash.com/photo-1567521464027-f127ff144326?w=400", count: 12500 },
   { name: "Delhi", image: "https://images.unsplash.com/photo-1564507592333-c60657eea523?w=400", count: 10200 },

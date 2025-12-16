@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { signIn, useSession } from "next-auth/react"
 import Link from "next/link"
-import { Home, Mail, Lock, Eye, EyeOff } from "lucide-react"
+import { Home, Mail, Lock, Eye, EyeOff, AlertCircle, CheckCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
@@ -14,18 +14,23 @@ export default function LoginPage() {
   const [password, setPassword] = useState("")
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState("")
+  const [success, setSuccess] = useState("")
   const [loading, setLoading] = useState(false)
 
   // Redirect if already logged in
   useEffect(() => {
     if (status === "authenticated" && session?.user) {
-      window.location.href = "/admin"
+      setSuccess("Login successful! Redirecting...")
+      setTimeout(() => {
+        window.location.href = "/admin"
+      }, 1000)
     }
   }, [status, session])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
+    setSuccess("")
     setLoading(true)
 
     try {
@@ -36,14 +41,20 @@ export default function LoginPage() {
       })
 
       if (result?.error) {
-        setError("Invalid email or password")
+        setError("Invalid email or password. Please check your credentials and try again.")
         setLoading(false)
+      } else if (result?.ok) {
+        setSuccess("Login successful! Redirecting to dashboard...")
+        setTimeout(() => {
+          window.location.href = "/admin"
+        }, 1000)
       } else {
-        // Redirect to admin dashboard after successful login
-        window.location.href = "/admin"
+        setError("Login failed. Please try again.")
+        setLoading(false)
       }
-    } catch {
-      setError("Something went wrong. Please try again.")
+    } catch (err) {
+      console.error("Login error:", err)
+      setError("Connection error. Please check your internet and try again.")
       setLoading(false)
     }
   }
@@ -63,8 +74,16 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-                {error}
+              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm flex items-center gap-2">
+                <AlertCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {success && (
+              <div className="p-3 bg-green-50 border border-green-200 rounded-lg text-green-600 text-sm flex items-center gap-2">
+                <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                <span>{success}</span>
               </div>
             )}
 
